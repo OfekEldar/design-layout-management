@@ -450,6 +450,10 @@ const clientDistPath = path.resolve(process.cwd(), 'dist')
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath))
 
+  // Read the SPA entry point once at startup so the fallback route does not touch
+  // the file system on every request.
+  const indexHtml = fs.readFileSync(path.join(clientDistPath, 'index.html'), 'utf8')
+
   // SPA fallback: send index.html for any non-API GET request so client-side
   // routing works on page reloads and deep links.
   app.use((request, response, next) => {
@@ -458,7 +462,7 @@ if (fs.existsSync(clientDistPath)) {
       return
     }
 
-    response.sendFile(path.join(clientDistPath, 'index.html'))
+    response.type('html').send(indexHtml)
   })
 }
 

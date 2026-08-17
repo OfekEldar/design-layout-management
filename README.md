@@ -180,7 +180,8 @@ for a shared team app. To switch:
    ```
 
 3. Set `DATABASE_URL` in the hosting dashboard to the PostgreSQL connection
-   string (e.g. `******host:5432/dbname?sslmode=require`).
+   string provided by Supabase/Neon. It has the form
+   `postgresql://<user>:<password>@<host>:5432/<dbname>?sslmode=require`.
 4. Remove the persistent disk block from `render.yaml` – it is only needed for
    SQLite.
 
