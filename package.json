@@ -8,6 +8,7 @@
     "dev:server": "prisma generate && prisma db push && tsx watch server/index.ts",
     "server": "prisma generate && prisma db push && tsx server/index.ts",
     "build": "prisma generate && tsc -b && vite build",
+    "start": "prisma generate && prisma db push && tsx server/index.ts",
     "lint": "oxlint .",
     "preview": "vite preview",
     "db:push": "prisma db push"

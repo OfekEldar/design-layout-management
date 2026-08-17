@@ -1,4 +1,7 @@
 import 'dotenv/config'
+import fs from 'node:fs'
+import path from 'node:path'
+
 import cors from 'cors'
 import express from 'express'
 
@@ -439,6 +442,26 @@ app.get('/api/notification-logs', async (_request, response) => {
   )
 })
 
+// In production the API also serves the built Vite frontend from `dist`, so the
+// entire app runs as a single service on a single port. The `dist` folder only
+// exists after `vite build`, which keeps the local dev proxy flow untouched.
+const clientDistPath = path.resolve(process.cwd(), 'dist')
+
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath))
+
+  // SPA fallback: send index.html for any non-API GET request so client-side
+  // routing works on page reloads and deep links.
+  app.use((request, response, next) => {
+    if (request.method !== 'GET' || request.path.startsWith('/api')) {
+      next()
+      return
+    }
+
+    response.sendFile(path.join(clientDistPath, 'index.html'))
+  })
+}
+
 app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
   console.error(error)
   response.status(500).json({ error: 'Internal server error.' })
@@ -449,7 +472,7 @@ async function startServer() {
   startNotificationScheduler()
 
   app.listen(port, () => {
-    console.log(`PLL workflow server listening on http://localhost:${port}`)
+    console.log(`PLL workflow server listening on port ${port}`)
   })
 }
 

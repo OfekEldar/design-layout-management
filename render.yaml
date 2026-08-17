@@ -1,0 +1,39 @@
+# Render Blueprint: deploy the whole app (frontend + backend) as one free web
+# service. In the Render dashboard choose "New +" -> "Blueprint" and point it at
+# this repository. Render reads this file and provisions everything below.
+#
+# By default this uses the bundled SQLite database on a persistent disk. To use a
+# free hosted PostgreSQL instead (Supabase/Neon), switch the Prisma provider to
+# "postgresql" and set DATABASE_URL in the dashboard (see README for details).
+services:
+  - type: web
+    name: design-layout-management
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    # A persistent disk keeps the SQLite file across deploys/restarts. Remove
+    # this block if you move DATABASE_URL to a hosted PostgreSQL database.
+    disk:
+      name: sqlite-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:/var/data/dev.db
+      - key: TEAM_LEAD_EMAIL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: ENABLE_NOTIFICATION_SCHEDULER
+        value: "false"
