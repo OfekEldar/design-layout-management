@@ -61,6 +61,7 @@ SMTP_PORT=587
 SMTP_USER=""
 SMTP_PASS=""
 SMTP_FROM="pll-workflow@example.com"
+CORS_ORIGIN="http://localhost:5173"
 VITE_API_BASE_URL=""
 ENABLE_NOTIFICATION_SCHEDULER=false
 ```

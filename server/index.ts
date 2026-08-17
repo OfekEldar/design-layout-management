@@ -7,6 +7,7 @@ import { runNotificationSweep, startNotificationScheduler } from './notification
 import {
   ApprovalStatus,
   NotificationDeliveryStatus,
+  Prisma,
   StageStatus,
   StageType,
   TaskPriority,
@@ -18,7 +19,11 @@ import {
 const app = express()
 const port = Number(process.env.PORT || 4000)
 
-app.use(cors())
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  }),
+)
 app.use(express.json())
 
 const stageTypes = [
@@ -56,6 +61,10 @@ function calculateBlockCompletion(progressValues: number[]) {
   }
 
   return Math.round(progressValues.reduce((sum, value) => sum + value, 0) / progressValues.length)
+}
+
+function isRecordNotFoundError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
 }
 
 async function loadDashboardSnapshot() {
@@ -179,12 +188,21 @@ app.patch('/api/users/:id/approval', async (request, response) => {
     return
   }
 
-  const user = await prisma.user.update({
-    where: { id: Number(request.params.id) },
-    data: { approvalStatus },
-  })
+  try {
+    const user = await prisma.user.update({
+      where: { id: Number(request.params.id) },
+      data: { approvalStatus },
+    })
 
-  response.json(user)
+    response.json(user)
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      response.status(404).json({ error: 'User not found.' })
+      return
+    }
+
+    throw error
+  }
 })
 
 app.get('/api/dashboard', async (_request, response) => {
@@ -241,21 +259,30 @@ app.patch('/api/block-stages/:id', async (request, response) => {
   const assignedUserId =
     request.body.assignedUserId === null ? null : parseOptionalInt(request.body.assignedUserId)
 
-  const blockStage = await prisma.blockStage.update({
-    where: { id: Number(request.params.id) },
-    data: {
-      status,
-      progress: Number.isFinite(progress) ? Math.min(100, Math.max(0, Number(progress))) : undefined,
-      assignedUserId,
-      notes: typeof request.body.notes === 'string' ? request.body.notes : undefined,
-    },
-    include: {
-      assignedUser: true,
-      block: true,
-    },
-  })
+  try {
+    const blockStage = await prisma.blockStage.update({
+      where: { id: Number(request.params.id) },
+      data: {
+        status,
+        progress: Number.isFinite(progress) ? Math.min(100, Math.max(0, Number(progress))) : undefined,
+        assignedUserId,
+        notes: typeof request.body.notes === 'string' ? request.body.notes : undefined,
+      },
+      include: {
+        assignedUser: true,
+        block: true,
+      },
+    })
 
-  response.json(blockStage)
+    response.json(blockStage)
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      response.status(404).json({ error: 'Block stage not found.' })
+      return
+    }
+
+    throw error
+  }
 })
 
 app.get('/api/tasks', async (_request, response) => {
@@ -324,40 +351,58 @@ app.patch('/api/tasks/:id', async (request, response) => {
         ? null
         : parseOptionalDate(request.body.dueAt)
 
-  const task = await prisma.task.update({
-    where: { id: Number(request.params.id) },
-    data: {
-      title: typeof request.body.title === 'string' ? request.body.title : undefined,
-      description: typeof request.body.description === 'string' ? request.body.description : undefined,
-      roleTag,
-      priority,
-      status,
-      blockId:
-        request.body.blockId === null ? null : parseOptionalInt(request.body.blockId),
-      assigneeId:
-        request.body.assigneeId === null ? null : parseOptionalInt(request.body.assigneeId),
-      dueAt,
-      isOpenTask,
-      emailReminderEnabled:
-        typeof request.body.emailReminderEnabled === 'boolean'
-          ? request.body.emailReminderEnabled
-          : undefined,
-    },
-    include: {
-      assignee: true,
-      block: true,
-    },
-  })
+  try {
+    const task = await prisma.task.update({
+      where: { id: Number(request.params.id) },
+      data: {
+        title: typeof request.body.title === 'string' ? request.body.title : undefined,
+        description: typeof request.body.description === 'string' ? request.body.description : undefined,
+        roleTag,
+        priority,
+        status,
+        blockId:
+          request.body.blockId === null ? null : parseOptionalInt(request.body.blockId),
+        assigneeId:
+          request.body.assigneeId === null ? null : parseOptionalInt(request.body.assigneeId),
+        dueAt,
+        isOpenTask,
+        emailReminderEnabled:
+          typeof request.body.emailReminderEnabled === 'boolean'
+            ? request.body.emailReminderEnabled
+            : undefined,
+      },
+      include: {
+        assignee: true,
+        block: true,
+      },
+    })
 
-  response.json(task)
+    response.json(task)
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      response.status(404).json({ error: 'Task not found.' })
+      return
+    }
+
+    throw error
+  }
 })
 
 app.delete('/api/tasks/:id', async (request, response) => {
-  await prisma.task.delete({
-    where: { id: Number(request.params.id) },
-  })
+  try {
+    await prisma.task.delete({
+      where: { id: Number(request.params.id) },
+    })
 
-  response.status(204).send()
+    response.status(204).send()
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      response.status(404).json({ error: 'Task not found.' })
+      return
+    }
+
+    throw error
+  }
 })
 
 app.post('/api/notifications/run-reminders', async (_request, response) => {

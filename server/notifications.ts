@@ -7,6 +7,8 @@ import {
 } from '@prisma/client'
 import { prisma } from './db'
 
+const transporter = createTransport()
+
 function createTransport() {
   const host = process.env.SMTP_HOST
   const port = Number(process.env.SMTP_PORT || 587)
@@ -50,8 +52,6 @@ async function sendTaskEmail(input: {
   subject: string
   message: string
 }) {
-  const transporter = createTransport()
-
   await transporter.sendMail({
     from: process.env.SMTP_FROM || 'pll-workflow@example.com',
     to: input.recipientEmail,
