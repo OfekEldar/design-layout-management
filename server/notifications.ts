@@ -42,7 +42,12 @@ async function logNotification(input: {
 
 async function alreadyNotified(taskId: number, recipientEmail: string, notificationType: NotificationType) {
   return prisma.notificationLog.findFirst({
-    where: { taskId, recipientEmail, notificationType },
+    where: {
+      taskId,
+      recipientEmail,
+      notificationType,
+      deliveryStatus: NotificationDeliveryStatus.SENT,
+    },
     select: { id: true },
   })
 }

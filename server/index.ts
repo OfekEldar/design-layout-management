@@ -67,6 +67,14 @@ function isRecordNotFoundError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+}
+
+function isForeignKeyConstraintError(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003'
+}
+
 async function loadDashboardSnapshot() {
   const [users, blocks, tasks, notificationLogs] = await Promise.all([
     prisma.user.findMany({ orderBy: { createdAt: 'asc' } }),
@@ -174,9 +182,12 @@ app.post('/api/auth/register', async (request, response) => {
 
     response.status(201).json(user)
   } catch (error) {
-    response.status(409).json({
-      error: error instanceof Error ? error.message : 'Unable to create registration request.',
-    })
+    if (isUniqueConstraintError(error)) {
+      response.status(409).json({ error: 'A user with this email already exists.' })
+      return
+    }
+
+    throw error
   }
 })
 
@@ -315,27 +326,36 @@ app.post('/api/tasks', async (request, response) => {
   const isOpenTask = Boolean(request.body.isOpenTask)
   const dueAt = isOpenTask ? undefined : parseOptionalDate(request.body.dueAt)
 
-  const task = await prisma.task.create({
-    data: {
-      title: String(request.body.title),
-      description: String(request.body.description),
-      roleTag,
-      priority,
-      status,
-      blockId: parseOptionalInt(request.body.blockId),
-      assigneeId: parseOptionalInt(request.body.assigneeId),
-      dueAt,
-      isOpenTask,
-      emailReminderEnabled: Boolean(request.body.emailReminderEnabled) && !isOpenTask,
-      reminderHoursBefore: parseOptionalInt(request.body.reminderHoursBefore) || 24,
-    },
-    include: {
-      assignee: true,
-      block: true,
-    },
-  })
+  try {
+    const task = await prisma.task.create({
+      data: {
+        title: String(request.body.title),
+        description: String(request.body.description),
+        roleTag,
+        priority,
+        status,
+        blockId: parseOptionalInt(request.body.blockId),
+        assigneeId: parseOptionalInt(request.body.assigneeId),
+        dueAt,
+        isOpenTask,
+        emailReminderEnabled: Boolean(request.body.emailReminderEnabled) && !isOpenTask,
+        reminderHoursBefore: parseOptionalInt(request.body.reminderHoursBefore) || 24,
+      },
+      include: {
+        assignee: true,
+        block: true,
+      },
+    })
 
-  response.status(201).json(task)
+    response.status(201).json(task)
+  } catch (error) {
+    if (isRecordNotFoundError(error) || isForeignKeyConstraintError(error)) {
+      response.status(404).json({ error: 'Block or assignee not found.' })
+      return
+    }
+
+    throw error
+  }
 })
 
 app.patch('/api/tasks/:id', async (request, response) => {
@@ -417,6 +437,11 @@ app.get('/api/notification-logs', async (_request, response) => {
       take: 20,
     }),
   )
+})
+
+app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
+  console.error(error)
+  response.status(500).json({ error: 'Internal server error.' })
 })
 
 async function startServer() {

@@ -41,7 +41,7 @@ const stageBlueprints = [
   {
     stageType: StageType.POST_LAYOUT_SIMULATION,
     status: StageStatus.NOT_STARTED,
-    progress: 15,
+    progress: 0,
     notes: 'Monte Carlo and jitter sweep deck is prepared.',
   },
 ] as const
