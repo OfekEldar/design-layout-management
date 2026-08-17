@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN_TEAM_LEAD
+  DESIGN_ENGINEER
+  LAYOUT_ENGINEER
+}
+
+enum ApprovalStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum StageType {
+  SCHEMATIC_DESIGN
+  LAYOUT_DRC_LVS
+  EMX_EXTRACTION
+  POST_LAYOUT_SIMULATION
+}
+
+enum StageStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum TaskRoleTag {
+  DESIGN
+  LAYOUT
+  ALL
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskStatus {
+  BACKLOG
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum NotificationType {
+  REMINDER
+  OVERDUE_WARNING
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  SKIPPED
+  FAILED
+}
+
+model User {
+  id             Int            @id @default(autoincrement())
+  name           String
+  email          String         @unique
+  role           UserRole
+  approvalStatus ApprovalStatus @default(PENDING_APPROVAL)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  assignedStages BlockStage[]   @relation("StageAssignee")
+  assignedTasks  Task[]         @relation("TaskAssignee")
+}
+
+model Block {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  stages      BlockStage[]
+  tasks       Task[]
+}
+
+model BlockStage {
+  id             Int         @id @default(autoincrement())
+  blockId        Int
+  stageType      StageType
+  status         StageStatus @default(NOT_STARTED)
+  progress       Int         @default(0)
+  notes          String?
+  assignedUserId Int?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  block          Block       @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  assignedUser   User?       @relation("StageAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([blockId, stageType])
+}
+
+model Task {
+  id                   Int          @id @default(autoincrement())
+  title                String
+  description          String
+  blockId              Int?
+  assigneeId           Int?
+  roleTag              TaskRoleTag
+  priority             TaskPriority @default(MEDIUM)
+  status               TaskStatus   @default(BACKLOG)
+  dueAt                DateTime?
+  isOpenTask           Boolean      @default(false)
+  emailReminderEnabled Boolean      @default(false)
+  reminderHoursBefore  Int          @default(24)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  assignee             User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  block                Block?       @relation(fields: [blockId], references: [id], onDelete: SetNull)
+  notificationLogs     NotificationLog[]
+}
+
+model NotificationLog {
+  id                  Int                        @id @default(autoincrement())
+  taskId              Int
+  recipientEmail      String
+  notificationType    NotificationType
+  deliveryStatus NotificationDeliveryStatus @default(PENDING)
+  scheduledFor        DateTime
+  sentAt              DateTime?
+  message             String
+  createdAt           DateTime                   @default(now())
+  task                Task                       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
